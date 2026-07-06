@@ -75,13 +75,26 @@ router.post('/incoming', async (req, res) => {
       include: { kb: true },
     });
 
+    // Resolve KB ID — fall back to business's first KB if campaign has none linked
+    let resolvedKbId = campaign?.kbId;
+    if (!resolvedKbId) {
+      const fallbackKb = await prisma.knowledgeBase.findFirst({
+        where: { businessId: lead.businessId },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (fallbackKb) {
+        resolvedKbId = fallbackKb.id;
+        console.log(`[Webhook] Campaign kbId was null — using fallback KB: ${resolvedKbId}`);
+      }
+    }
+
     const result = await agentService.callAgent({
       threadId:       phone,
       businessId:     lead.businessId,
       leadId:         lead.id,
       leadName:       lead.name,
       message:        Body,
-      kbId:           campaign?.kbId,
+      kbId:           resolvedKbId,
       campaignConfig: campaign,
     });
 
